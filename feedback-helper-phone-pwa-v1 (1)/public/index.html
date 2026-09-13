@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0f">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <title>Feedback Helper</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;background:#0d0d0f;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    body{min-height:100svh}.wrap{width:min(720px,100%);margin:auto;padding:18px 16px 60px}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:12px}.top h1{margin:0;font-size:24px}.chip{font-size:12px;color:#bbb;background:#242428;padding:6px 9px;border-radius:999px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;background:#19191c;border:1px solid #303036;border-radius:18px;padding:8px}
+    button{border:0;border-radius:13px;padding:13px;font-size:15px;font-weight:800;cursor:pointer}.tabs button{background:#29292e;color:#fff}.tabs button.active,.primary{background:#ffd500;color:#111}
+    .card{margin-top:16px;background:#19191c;border:1px solid #303036;border-radius:20px;padding:16px}.drop{display:block;text-align:center;border:1.5px dashed #4b4b53;border-radius:17px;padding:28px 12px;cursor:pointer}.drop input{display:none}.drop strong{display:block;font-size:19px}.drop span{display:block;color:#999;margin-top:6px;font-size:13px}
+    label{display:block;font-size:12px;color:#aaa;margin:12px 0 6px}textarea,input,select{width:100%;background:#0f0f11;color:#fff;border:1px solid #3a3a42;border-radius:12px;padding:12px;font-size:15px;outline:none}textarea{min-height:82px;resize:vertical}
+    .primary,.secondary{width:100%;margin-top:12px}.secondary{background:#2c2c31;color:#fff}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.statusrow{display:flex;justify-content:space-between;gap:12px;align-items:center}.bar{height:11px;background:#303036;border-radius:999px;overflow:hidden;margin:14px 0}.bar>div{height:100%;width:0;background:#ffd500;transition:width .25s}.muted{font-size:13px;color:#999;line-height:1.45}.log{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:#b9b9c1;margin:12px 0 0;background:#101012;border-radius:12px;padding:10px;min-height:88px;max-height:230px;overflow:auto}
+    .hidden{display:none!important}.note{font-size:11px;color:#777;margin-top:10px}.ok{color:#a2e9a8}.err{color:#ffabab}
+    @media(max-width:540px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Feedback Helper</h1><span class="chip">PHONE PWA</span></div>
+
+  <div class="tabs">
+    <button id="tabRun" class="active">Запуск</button>
+    <button id="tabSettings">Налаштування</button>
+  </div>
+
+  <section id="runPane">
+    <div class="card">
+      <label class="drop">
+        <input id="photo" type="file" accept="image/*" capture="environment">
+        <strong>📷 Сфоткати чек</strong>
+        <span>або вибрати фото</span>
+      </label>
+
+      <label>Або встав QR-посилання</label>
+      <textarea id="surveyUrl" spellcheck="false" placeholder="https://feedback.mcdonalds.com/jfe/form/..."></textarea>
+
+      <button id="startBtn" class="primary">Запустити</button>
+    </div>
+
+    <div class="card">
+      <div class="statusrow">
+        <strong id="status">Готово</strong>
+        <span id="percent">0%</span>
+      </div>
+      <div class="bar"><div id="barFill"></div></div>
+      <div id="detail" class="muted">Сфоткай чек. Пресет підставиться автоматично.</div>
+      <div id="log" class="log">Очікую…</div>
+      <button id="stopBtn" class="secondary hidden">Зупинити</button>
+    </div>
+  </section>
+
+  <section id="settingsPane" class="hidden">
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label>Загальна оцінка</label>
+          <select id="satisfaction"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select>
+        </div>
+        <div>
+          <label>Замовлення</label>
+          <select id="orderCorrect"><option value="true">Все правильно</option><option value="false">Було неправильно</option></select>
+        </div>
+      </div>
+
+      <label>Чим найбільше задоволені</label>
+      <select id="mainReason">
+        <option>Швидкість обслуговування</option>
+        <option>Привітність персоналу</option>
+        <option>Якість їжі та/або напоїв</option>
+        <option>Чистота</option>
+        <option>Інше (будь ласка, уточніть)</option>
+      </select>
+
+      <div id="otherWrap" class="hidden">
+        <label>Уточнення для «Інше»</label>
+        <input id="mainReasonOther">
+      </div>
+
+      <div class="grid">
+        <div><label>Ціна / якість</label><select id="valueForMoney"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+        <div><label>Повернуся</label><select id="revisit"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+      </div>
+
+      <label>Коментар до оцінки</label>
+      <input id="visitComment" placeholder="необов'язково">
+
+      <label>Працівник / фінальний коментар</label>
+      <input id="employeeComment" placeholder="необов'язково">
+
+      <button id="saveBtn" class="primary">Зберегти пресет</button>
+      <div class="note">Пресет використовується автоматично після фото.</div>
+    </div>
+  </section>
+
+  <canvas id="qrCanvas" class="hidden"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const KEY = "feedback-helper-preset-v1";
+const DEFAULT_PRESET = {
+  satisfaction:5, orderCorrect:true, mainReason:"Швидкість обслуговування",
+  mainReasonOther:"", valueForMoney:5, revisit:5, visitComment:"", employeeComment:""
+};
+let currentJob = null;
+let pollTimer = null;
+
+function setTab(run) {
+  $("runPane").classList.toggle("hidden", !run);
+  $("settingsPane").classList.toggle("hidden", run);
+  $("tabRun").classList.toggle("active", run);
+  $("tabSettings").classList.toggle("active", !run);
+}
+$("tabRun").onclick = () => setTab(true);
+$("tabSettings").onclick = () => setTab(false);
+
+function getPreset() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || DEFAULT_PRESET; }
+  catch { return DEFAULT_PRESET; }
+}
+function loadPreset() {
+  const p = getPreset();
+  $("satisfaction").value = p.satisfaction;
+  $("orderCorrect").value = String(p.orderCorrect);
+  $("mainReason").value = p.mainReason;
+  $("mainReasonOther").value = p.mainReasonOther || "";
+  $("valueForMoney").value = p.valueForMoney;
+  $("revisit").value = p.revisit;
+  $("visitComment").value = p.visitComment || "";
+  $("employeeComment").value = p.employeeComment || "";
+  toggleOther();
+}
+function toggleOther() {
+  $("otherWrap").classList.toggle("hidden", !$("mainReason").value.startsWith("Інше"));
+}
+$("mainReason").onchange = toggleOther;
+$("saveBtn").onclick = () => {
+  const p = {
+    satisfaction:+$("satisfaction").value,
+    orderCorrect:$("orderCorrect").value === "true",
+    mainReason:$("mainReason").value,
+    mainReasonOther:$("mainReasonOther").value.trim(),
+    valueForMoney:+$("valueForMoney").value,
+    revisit:+$("revisit").value,
+    visitComment:$("visitComment").value.trim(),
+    employeeComment:$("employeeComment").value.trim()
+  };
+  localStorage.setItem(KEY, JSON.stringify(p));
+  $("saveBtn").textContent = "Збережено ✓";
+  setTimeout(() => $("saveBtn").textContent = "Зберегти пресет", 900);
+};
+
+function validUrl(raw) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" &&
+      u.hostname === "feedback.mcdonalds.com" &&
+      u.pathname.startsWith("/jfe/form/SV_");
+  } catch { return false; }
+}
+
+function render(job) {
+  const p = Math.max(0, Math.min(100, Number(job?.progress || 0)));
+  $("status").textContent = job?.status || "Готово";
+  $("percent").textContent = p + "%";
+  $("barFill").style.width = p + "%";
+  $("detail").textContent = job?.detail || "";
+  $("log").textContent = (job?.log?.length ? job.log.join("\n") : "Очікую…");
+  $("stopBtn").classList.toggle("hidden", job?.state !== "running");
+}
+
+async function poll() {
+  if (!currentJob) return;
+  try {
+    const r = await fetch("/api/jobs/" + encodeURIComponent(currentJob), { cache:"no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const job = await r.json();
+    render(job);
+    if (job.state !== "running") {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      currentJob = null;
+    }
+  } catch (e) {
+    render({progress:100,status:"Помилка зв'язку",detail:e.message,log:[e.message]});
+    clearInterval(pollTimer); pollTimer = null; currentJob = null;
+  }
+}
+
+async function startSurvey(url) {
+  if (!validUrl(url)) {
+    render({progress:100,status:"Помилка",detail:"Невірне QR-посилання",log:["Очікується feedback.mcdonalds.com/jfe/form/SV_..."]});
+    return;
+  }
+
+  render({progress:3,status:"Старт…",detail:"Створюю задачу",log:["QR OK"]});
+
+  const r = await fetch("/api/jobs", {
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({ surveyUrl:url, preset:getPreset() })
+  });
+
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    render({progress:100,status:"Помилка",detail:data.error || ("HTTP " + r.status),log:[data.error || "Не вдалося запустити"]});
+    return;
+  }
+
+  currentJob = data.id;
+  render(data);
+  clearInterval(pollTimer);
+  pollTimer = setInterval(poll, 700);
+  poll();
+}
+
+$("startBtn").onclick = () => startSurvey($("surveyUrl").value.trim());
+$("stopBtn").onclick = async () => {
+  if (!currentJob) return;
+  await fetch("/api/jobs/" + encodeURIComponent(currentJob), { method:"DELETE" }).catch(() => {});
+};
+
+async function decodeQR(file) {
+  const img = await createImageBitmap(file);
+  const canvas = $("qrCanvas");
+  const max = 2200;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  const ctx = canvas.getContext("2d", { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  if ("BarcodeDetector" in window) {
+    try {
+      const detector = new BarcodeDetector({ formats:["qr_code"] });
+      const result = await detector.detect(canvas);
+      if (result[0]?.rawValue) return result[0].rawValue;
+    } catch {}
+  }
+
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const code = window.jsQR?.(data.data, data.width, data.height, { inversionAttempts:"attemptBoth" });
+  if (code?.data) return code.data;
+  throw new Error("QR на фото не знайдено");
+}
+
+$("photo").addEventListener("change", async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  render({progress:2,status:"Читаю QR…",detail:"",log:["Фото отримано"]});
+  try {
+    const url = await decodeQR(file);
+    $("surveyUrl").value = url;
+    await startSurvey(url);
+  } catch (err) {
+    render({progress:100,status:"Помилка",detail:err.message || String(err),log:[err.message || String(err)]});
+  } finally {
+    e.target.value = "";
+  }
+});
+
+loadPreset();
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
