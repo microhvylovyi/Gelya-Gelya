@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0f">
+  <link rel="manifest" href="/manifest.webmanifest?v=4">
+  <title>Геля-Геля</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;background:#0d0d0f;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    body{min-height:100svh}.wrap{width:min(720px,100%);margin:auto;padding:18px 16px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.top h1{margin:0;font-size:24px}.chip{font-size:12px;color:#bbb;background:#242428;padding:6px 9px;border-radius:999px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;background:#19191c;border:1px solid #303036;border-radius:18px;padding:8px}
+    button{border:0;border-radius:13px;padding:13px;font-size:15px;font-weight:800;cursor:pointer}.tabs button{background:#29292e;color:#fff}.tabs button.active,.primary{background:#ffd500;color:#111}.secondary{background:#2c2c31;color:#fff}.danger{background:#3a2325;color:#ffb8b8}
+    .card{margin-top:16px;background:#19191c;border:1px solid #303036;border-radius:20px;padding:16px}.uploadGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pick{display:block;text-align:center;border:1.5px dashed #4b4b53;border-radius:17px;padding:22px 10px;cursor:pointer}.pick input{display:none}.pick strong{display:block;font-size:17px}.pick span{display:block;color:#999;margin-top:6px;font-size:12px}
+    label{display:block;font-size:12px;color:#aaa;margin:12px 0 6px}textarea,input,select{width:100%;background:#0f0f11;color:#fff;border:1px solid #3a3a42;border-radius:12px;padding:12px;font-size:15px;outline:none}textarea{min-height:82px;resize:vertical}
+    input[type=checkbox]{width:auto;accent-color:#ffd500}.primary,.secondary,.danger{width:100%;margin-top:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.statusrow{display:flex;justify-content:space-between;gap:12px;align-items:center}.bar{height:11px;background:#303036;border-radius:999px;overflow:hidden;margin:14px 0}.bar>div{height:100%;width:0;background:#ffd500;transition:width .25s}.muted{font-size:13px;color:#999;line-height:1.45}.note{font-size:11px;color:#777;margin-top:10px}.log{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:#b9b9c1;margin:12px 0 0;background:#101012;border-radius:12px;padding:10px;min-height:88px;max-height:230px;overflow:auto}.hidden{display:none!important}
+    .queueHead{display:flex;justify-content:space-between;align-items:center;gap:10px}.queueCount{font-size:12px;color:#aaa}.queueItem{margin-top:9px;background:#101012;border:1px solid #2d2d33;border-radius:13px;padding:11px}.queueTop{display:flex;align-items:center;justify-content:space-between;gap:10px}.queueCode{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.queueBtns{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}.queueBtns button{padding:10px;margin:0}.removeBtn{width:auto!important;padding:10px 13px!important}.checkList{display:grid;gap:8px;margin-top:8px}.checkRow{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:11px;background:#101012}.checkRow label{margin:0;color:#ddd;font-size:13px}.toggleRow{display:flex;align-items:center;gap:10px;margin-top:12px}.toggleRow span{font-size:13px;color:#ddd}
+    @media(max-width:540px){.grid{grid-template-columns:1fr}.uploadGrid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Геля-Геля</h1><span class="chip">PWA v4.1</span></div>
+
+  <div class="tabs">
+    <button id="tabRun" class="active">Запуск</button>
+    <button id="tabSettings">Налаштування</button>
+  </div>
+
+  <section id="runPane">
+    <div class="card">
+      <div class="uploadGrid">
+        <label class="pick">
+          <input id="cameraInput" type="file" accept="image/*" capture="environment">
+          <strong>📷 Сфоткати</strong><span>відкрити камеру</span>
+        </label>
+        <label class="pick">
+          <input id="galleryInput" type="file" accept="image/*" multiple>
+          <strong>🖼️ Галерея</strong><span>можна кілька чеків</span>
+        </label>
+      </div>
+
+      <label>Або встав QR-посилання</label>
+      <textarea id="surveyUrl" spellcheck="false" placeholder="https://feedback.mcdonalds.com/jfe/form/..."></textarea>
+      <button id="startBtn" class="primary">Запустити це посилання</button>
+    </div>
+
+    <div id="queueCard" class="card hidden">
+      <div class="queueHead"><strong>Чеки в пам'яті</strong><span id="queueCount" class="queueCount"></span></div>
+      <div id="queueList"></div>
+      <button id="clearQueueBtn" class="danger">Очистити список</button>
+    </div>
+
+    <div class="card">
+      <div class="statusrow"><strong id="status">Готово</strong><span id="percent">0%</span></div>
+      <div class="bar"><div id="barFill"></div></div>
+      <div id="detail" class="muted">Сфоткай чек, вибери фото або завантаж кілька в чергу.</div>
+      <div id="log" class="log">Очікую…</div>
+      <button id="stopBtn" class="secondary hidden">Зупинити</button>
+    </div>
+  </section>
+
+  <section id="settingsPane" class="hidden">
+    <div class="card">
+      <div class="grid">
+        <div><label>Загальна оцінка</label><select id="satisfaction"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+        <div><label>Замовлення</label><select id="orderCorrect"><option value="true">Все правильно</option><option value="false">Було неправильно</option></select></div>
+      </div>
+
+      <label>«Чим найбільше задоволені»</label>
+      <select id="reasonMode"><option value="fixed">Один фіксований варіант</option><option value="random">Випадково серед вибраних</option></select>
+      <div id="fixedReasonWrap">
+        <select id="mainReason">
+          <option>Швидкість обслуговування</option><option>Привітність персоналу</option><option>Якість їжі та/або напоїв</option><option>Чистота</option><option>Інше (будь ласка, уточніть)</option>
+        </select>
+      </div>
+      <div id="randomReasonsWrap" class="hidden checkList">
+        <div class="checkRow"><input id="rrSpeed" type="checkbox" value="Швидкість обслуговування"><label for="rrSpeed">Швидкість обслуговування</label></div>
+        <div class="checkRow"><input id="rrFriendly" type="checkbox" value="Привітність персоналу"><label for="rrFriendly">Привітність персоналу</label></div>
+        <div class="checkRow"><input id="rrFood" type="checkbox" value="Якість їжі та/або напоїв"><label for="rrFood">Якість їжі та/або напоїв</label></div>
+        <div class="checkRow"><input id="rrClean" type="checkbox" value="Чистота"><label for="rrClean">Чистота</label></div>
+      </div>
+
+      <div id="otherWrap" class="hidden"><label>Уточнення для «Інше»</label><input id="mainReasonOther"></div>
+
+      <div class="grid">
+        <div><label>Ціна / якість</label><select id="valueForMoney"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+        <div><label>Повернуся</label><select id="revisit"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+      </div>
+
+      <div class="toggleRow"><input id="randomPhraseEnabled" type="checkbox"><span>Випадкова фраза відгуку</span></div>
+      <div id="phrasePoolWrap" class="hidden">
+        <label>Фрази, по одній у рядок</label>
+        <textarea id="feedbackPhrases" placeholder="Все сподобалось\nШвидко і смачно\nГарне обслуговування"></textarea>
+        <div class="note">На кожен запуск обирається одна випадкова фраза з цього списку.</div>
+      </div>
+      <div id="fixedCommentWrap"><label>Фіксований коментар до оцінки</label><input id="visitComment" placeholder="необов'язково"></div>
+
+      <label>Працівник / фінальний коментар</label><input id="employeeComment" placeholder="необов'язково">
+      <button id="saveBtn" class="primary">Зберегти налаштування</button>
+    </div>
+  </section>
+  <canvas id="qrCanvas" class="hidden"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const KEY = "gelya-preset-v4";
+const QUEUE_KEY = "gelya-queue-v4";
+const DEFAULT_PRESET = {satisfaction:5,orderCorrect:true,reasonMode:"fixed",mainReason:"Швидкість обслуговування",randomReasons:["Швидкість обслуговування","Привітність персоналу"],mainReasonOther:"",valueForMoney:5,revisit:5,randomPhraseEnabled:false,feedbackPhrases:["Все сподобалось","Швидко і смачно","Гарне обслуговування"],visitComment:"",employeeComment:""};
+let currentJob=null,pollTimer=null,currentQueueUrl=null;
+
+function setTab(run){$("runPane").classList.toggle("hidden",!run);$("settingsPane").classList.toggle("hidden",run);$("tabRun").classList.toggle("active",run);$("tabSettings").classList.toggle("active",!run)}
+$("tabRun").onclick=()=>setTab(true);$("tabSettings").onclick=()=>setTab(false);
+function validUrl(raw){try{const u=new URL(raw);return u.protocol==="https:"&&u.hostname==="feedback.mcdonalds.com"&&u.pathname.startsWith("/jfe/form/SV_")}catch{return false}}
+function getPreset(){try{return {...DEFAULT_PRESET,...(JSON.parse(localStorage.getItem(KEY))||{})}}catch{return {...DEFAULT_PRESET}}}
+function getQueue(){try{const q=JSON.parse(localStorage.getItem(QUEUE_KEY));return Array.isArray(q)?q.filter(validUrl):[]}catch{return []}}
+function setQueue(q){localStorage.setItem(QUEUE_KEY,JSON.stringify([...new Set(q)]));renderQueue()}
+function codeLabel(url){try{const u=new URL(url);const code=u.searchParams.get("surv_cd")||"QR";return code.length>30?code.slice(0,12)+"…"+code.slice(-10):code}catch{return "QR"}}
+function renderQueue(){const q=getQueue();$("queueCard").classList.toggle("hidden",q.length===0);$("queueCount").textContent=q.length+" шт.";$("queueList").innerHTML="";q.forEach((url,i)=>{const item=document.createElement("div");item.className="queueItem";item.innerHTML=`<div class="queueTop"><div class="queueCode">${i+1}. ${codeLabel(url)}</div></div><div class="queueBtns"><button class="primary useBtn">Використати</button><button class="danger removeBtn">✕</button></div>`;item.querySelector(".useBtn").onclick=()=>{currentQueueUrl=url;$("surveyUrl").value=url;startSurvey(url)};item.querySelector(".removeBtn").onclick=()=>setQueue(getQueue().filter(x=>x!==url));$("queueList").appendChild(item)})}
+$("clearQueueBtn").onclick=()=>setQueue([]);
+
+function toggleSettings(){const p=getPreset();const random=$("reasonMode").value==="random";$("fixedReasonWrap").classList.toggle("hidden",random);$("randomReasonsWrap").classList.toggle("hidden",!random);$("otherWrap").classList.toggle("hidden",random||!$("mainReason").value.startsWith("Інше"));const rp=$("randomPhraseEnabled").checked;$("phrasePoolWrap").classList.toggle("hidden",!rp);$("fixedCommentWrap").classList.toggle("hidden",rp)}
+$("reasonMode").onchange=toggleSettings;$("mainReason").onchange=toggleSettings;$("randomPhraseEnabled").onchange=toggleSettings;
+function loadPreset(){const p=getPreset();$("satisfaction").value=p.satisfaction;$("orderCorrect").value=String(p.orderCorrect);$("reasonMode").value=p.reasonMode||"fixed";$("mainReason").value=p.mainReason;$("mainReasonOther").value=p.mainReasonOther||"";$("valueForMoney").value=p.valueForMoney;$("revisit").value=p.revisit;$("randomPhraseEnabled").checked=!!p.randomPhraseEnabled;$("feedbackPhrases").value=(p.feedbackPhrases||[]).join("\n");$("visitComment").value=p.visitComment||"";$("employeeComment").value=p.employeeComment||"";const rs=new Set(p.randomReasons||[]);[["rrSpeed","Швидкість обслуговування"],["rrFriendly","Привітність персоналу"],["rrFood","Якість їжі та/або напоїв"],["rrClean","Чистота"]].forEach(([id,v])=>$(id).checked=rs.has(v));toggleSettings()}
+$("saveBtn").onclick=()=>{const randomReasons=["rrSpeed","rrFriendly","rrFood","rrClean"].filter(id=>$(id).checked).map(id=>$(id).value);const p={satisfaction:+$("satisfaction").value,orderCorrect:$("orderCorrect").value==="true",reasonMode:$("reasonMode").value,mainReason:$("mainReason").value,randomReasons,mainReasonOther:$("mainReasonOther").value.trim(),valueForMoney:+$("valueForMoney").value,revisit:+$("revisit").value,randomPhraseEnabled:$("randomPhraseEnabled").checked,feedbackPhrases:$("feedbackPhrases").value.split(/\n+/).map(s=>s.trim()).filter(Boolean),visitComment:$("visitComment").value.trim(),employeeComment:$("employeeComment").value.trim()};if(p.reasonMode==="random"&&!p.randomReasons.length){alert("Вибери хоча б один варіант для рандому");return}if(p.randomPhraseEnabled&&!p.feedbackPhrases.length){alert("Додай хоча б одну фразу");return}localStorage.setItem(KEY,JSON.stringify(p));$("saveBtn").textContent="Збережено ✓";setTimeout(()=>$("saveBtn").textContent="Зберегти налаштування",900)};
+function randomItem(arr){return arr[Math.floor(Math.random()*arr.length)]}
+function presetForRun(){const p=getPreset();const out={...p};if(p.reasonMode==="random"&&p.randomReasons?.length)out.mainReason=randomItem(p.randomReasons);if(p.randomPhraseEnabled&&p.feedbackPhrases?.length)out.visitComment=randomItem(p.feedbackPhrases);return out}
+
+function render(job){const p=Math.max(0,Math.min(100,Number(job?.progress||0)));$("status").textContent=job?.status||"Готово";$("percent").textContent=p+"%";$("barFill").style.width=p+"%";$("detail").textContent=job?.detail||"";$("log").textContent=(job?.log?.length?job.log.join("\n"):"Очікую…");$("stopBtn").classList.toggle("hidden",job?.state!=="running")}
+async function poll(){if(!currentJob)return;try{const r=await fetch("/api/jobs/"+encodeURIComponent(currentJob),{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);const job=await r.json();render(job);if(job.state!=="running"){clearInterval(pollTimer);pollTimer=null;currentJob=null;if(job.state==="done"&&currentQueueUrl){setQueue(getQueue().filter(x=>x!==currentQueueUrl));currentQueueUrl=null;$("surveyUrl").value=""}else if(job.state!=="done"){currentQueueUrl=null}}}catch(e){render({progress:100,status:"Помилка зв'язку",detail:e.message,log:[e.message]});clearInterval(pollTimer);pollTimer=null;currentJob=null}}
+async function startSurvey(url){if(!validUrl(url)){render({progress:100,status:"Помилка",detail:"Невірне QR-посилання",log:["Очікується feedback.mcdonalds.com/jfe/form/SV_..."]});return}const preset=presetForRun();render({progress:3,status:"Старт…",detail:"Відправляю чек у Геля-Геля",log:["QR OK",`Причина: ${preset.mainReason}`,preset.visitComment?`Фраза: ${preset.visitComment}`:""]});const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({surveyUrl:url,preset})});const data=await r.json().catch(()=>({}));if(!r.ok){render({progress:100,status:"Помилка",detail:data.error||("HTTP "+r.status),log:[data.error||"Не вдалося запустити"]});return}currentJob=data.id;render(data);clearInterval(pollTimer);pollTimer=setInterval(poll,700);poll()}
+$("startBtn").onclick=()=>{currentQueueUrl=null;startSurvey($("surveyUrl").value.trim())};$("stopBtn").onclick=async()=>{if(!currentJob)return;await fetch("/api/jobs/"+encodeURIComponent(currentJob),{method:"DELETE"}).catch(()=>{})};
+
+async function decodeQR(file){
+  const img=await createImageBitmap(file),canvas=$("qrCanvas"),ctx=canvas.getContext("2d",{willReadFrequently:true});
+  const detector=("BarcodeDetector" in window)?(()=>{try{return new BarcodeDetector({formats:["qr_code"]})}catch{return null}})():null;
+  const tryCanvas=async(c)=>{
+    if(detector){try{const r=await detector.detect(c);if(r[0]?.rawValue)return r[0].rawValue}catch{}}
+    try{const x=c.getContext("2d",{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),q=window.jsQR?.(d.data,d.width,d.height,{inversionAttempts:"attemptBoth"});if(q?.data)return q.data}catch{}
+    return "";
+  };
+  const drawRegion=(sx,sy,sw,sh,boost=1)=>{
+    const max=2800,base=Math.min(1,max/Math.max(sw,sh)),scale=Math.min(3,Math.max(1,base*boost));
+    canvas.width=Math.max(1,Math.round(sw*scale));canvas.height=Math.max(1,Math.round(sh*scale));
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  };
+  drawRegion(0,0,img.width,img.height,1);let hit=await tryCanvas(canvas);if(hit)return hit;
+  const regions=[];
+  const add=(x,y,w,h)=>regions.push([Math.max(0,x),Math.max(0,y),Math.min(w,img.width-Math.max(0,x)),Math.min(h,img.height-Math.max(0,y))]);
+  const W=img.width,H=img.height;
+  add(W*.12,H*.12,W*.76,H*.76);add(W*.18,H*.28,W*.64,H*.64);add(W*.08,H*.30,W*.84,H*.62);add(W*.20,H*.38,W*.60,H*.55);
+  for(let rows of [2,3])for(let cols of [2,3]){const tw=W/cols,th=H/rows;for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const ox=tw*.16,oy=th*.16;add(x*tw-ox,y*th-oy,tw+ox*2,th+oy*2)}}
+  for(const [sx,sy,sw,sh] of regions){if(sw<120||sh<120)continue;drawRegion(sx,sy,sw,sh,1.8);hit=await tryCanvas(canvas);if(hit)return hit;}
+  // Останній прохід: підсилюємо контраст, корисно для фото екрана/термочека з муаром.
+  drawRegion(0,0,W,H,1.4);let d=ctx.getImageData(0,0,canvas.width,canvas.height),a=d.data;for(let i=0;i<a.length;i+=4){const g=.299*a[i]+.587*a[i+1]+.114*a[i+2],v=g<150?0:255;a[i]=a[i+1]=a[i+2]=v}ctx.putImageData(d,0,0);hit=await tryCanvas(canvas);if(hit)return hit;
+  throw new Error("QR на фото не знайдено. Спробуй кадр ближче до самого QR.");
+}
+async function addFiles(files,autoStartSingle=false){const arr=[...files];if(!arr.length)return;render({progress:2,status:"Читаю чеки…",detail:`0/${arr.length}`,log:["Розпізнаю QR"]});const found=[];const errors=[];for(let i=0;i<arr.length;i++){try{const url=await decodeQR(arr[i]);if(validUrl(url))found.push(url);else errors.push(`${arr[i].name}: QR не анкети`)}catch(e){errors.push(`${arr[i].name}: ${e.message||e}`)}render({progress:Math.round(((i+1)/arr.length)*20),status:"Читаю чеки…",detail:`${i+1}/${arr.length}`,log:[`Знайдено: ${found.length}`,`Помилок: ${errors.length}`]})}if(found.length){setQueue([...getQueue(),...found]);render({progress:0,status:"Готово",detail:`Додано чеків: ${new Set(found).size}. Всього в пам'яті: ${getQueue().length}`,log:errors.length?errors:["QR збережені в чергу"]});if(autoStartSingle&&found.length===1){currentQueueUrl=found[0];$("surveyUrl").value=found[0];startSurvey(found[0])}}else render({progress:100,status:"QR не знайдено",detail:"Не вдалося прочитати жоден чек",log:errors})}
+$("cameraInput").addEventListener("change",async e=>{await addFiles(e.target.files,true);e.target.value=""});$("galleryInput").addEventListener("change",async e=>{await addFiles(e.target.files,false);e.target.value=""});
+
+loadPreset();renderQueue();
+if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{})}
+</script>
+</body></html>
