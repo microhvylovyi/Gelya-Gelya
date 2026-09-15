@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#ffd500"/>
+  <rect x="54" y="54" width="404" height="404" rx="92" fill="#101012"/>
+  <rect x="82" y="82" width="348" height="348" rx="76" fill="#ffd500"/>
+  <text x="256" y="316" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="188" font-weight="900" fill="#101012">ГГ</text>
+</svg>

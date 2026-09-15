@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 8080);
-
 const jobs = new Map();
 let browserPromise = null;
 
@@ -31,6 +30,7 @@ function normalizePreset(input={}) {
     employeeComment: String(input.employeeComment||"").slice(0,1200)
   };
 }
+
 function validSurveyUrl(raw){try{const u=new URL(raw);return u.protocol==="https:"&&u.hostname==="feedback.mcdonalds.com"&&u.pathname.startsWith("/jfe/form/SV_")}catch{return false}}
 function publicJob(j){return {id:j.id,state:j.state,progress:j.progress,status:j.status,detail:j.detail,log:j.log.slice(-16),createdAt:j.createdAt,updatedAt:j.updatedAt}}
 function update(j,progress,status,detail="",line=""){j.progress=Math.max(j.progress||0,Math.min(100,progress));j.status=status;j.detail=detail;j.updatedAt=Date.now();if(line&&j.log[j.log.length-1]!==line)j.log.push(line);if(j.log.length>40)j.log.splice(0,j.log.length-40)}
@@ -40,10 +40,15 @@ async function getBrowser(){
   if(!browserPromise) browserPromise=chromium.launch({headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]}).catch(e=>{browserPromise=null;throw e});
   return browserPromise;
 }
+
 async function bodyText(page){return (await page.locator("body").innerText({timeout:7000}).catch(()=>"")).replace(/\s+/g," ").trim()}
 function completionText(text){const t=text.toLowerCase();return t.includes("дякуємо, що поділились позитивними враженнями")||t.includes("дякуємо за ваш відгук")||t.includes("thank you for your feedback")}
 function usedText(text){const t=text.toLowerCase();return t.includes("вже було використано")||t.includes("вже використано")||t.includes("вже брали участь")||t.includes("already been completed")||t.includes("already completed")||t.includes("already used")||t.includes("response has already been recorded")}
 function introText(text){const t=text.toLowerCase();return t.includes("дякуємо, що завітали до mcdonald")||t.includes("опитування займе лише кілька хвилин")||(t.includes("мова українська")&&t.includes("наступна сторінка"))}
+function loadingText(text){
+  const t=(text||"").toLowerCase();
+  return t.includes("триває завантаження сторінки")||t.includes("loading page")||t.includes("page is loading")||(t.includes("qualtrics")&&t.includes("0%")&&t.includes("завершення опитування"));
+}
 function detectStage(text){
   if(text.includes("Загалом, наскільки ви задоволені"))return "satisfaction";
   if(text.includes("Чи все було правильно у вашому замовленні"))return "correct";
@@ -52,6 +57,18 @@ function detectStage(text){
   if(text.includes("наступних 30 днів"))return "revisit";
   if(text.includes("відзначити працівника за обслуговування"))return "employee";
   return "";
+}
+
+async function waitOutLoading(page,job,timeout=30000){
+  const started=Date.now();
+  let text=await bodyText(page);
+  while(loadingText(text)&&Date.now()-started<timeout){
+    const elapsed=Math.round((Date.now()-started)/1000);
+    update(job,Math.max(job.progress||0,14),"Qualtrics завантажує…",`Чекаю появу питання · ${elapsed} с`,"Waiting for Qualtrics");
+    await wait(800);
+    text=await bodyText(page);
+  }
+  return text;
 }
 
 async function questionContainer(page,q){
@@ -71,7 +88,19 @@ async function clickNext(page){
   const cs=[page.locator("#NextButton").first(),page.getByRole("button",{name:/наступна сторінка/i}).first(),page.getByRole("button",{name:/далі/i}).first(),page.getByRole("button",{name:/next/i}).first(),page.getByRole("button",{name:/почати|розпочати|start/i}).first(),page.locator('input[type="submit"][value*="Наступна" i]').first(),page.locator('input[type="submit"][value*="Далі" i]').first(),page.locator('input[type="submit"][value*="Next" i]').first()];
   for(const loc of cs){if(await loc.count()&&await loc.isVisible().catch(()=>false)){try{await loc.click({timeout:3500});return true}catch{}}}return false;
 }
-async function waitForChange(page,beforeStage,beforeText,timeout=7000){const start=Date.now();while(Date.now()-start<timeout){await wait(300);const text=await bodyText(page);if(completionText(text)||usedText(text))return true;const st=detectStage(text);if(st&&st!==beforeStage)return true;if(text&&text!==beforeText&&!introText(text))return true}return false}
+async function waitForChange(page,beforeStage,beforeText,timeout=30000){
+  const start=Date.now();
+  while(Date.now()-start<timeout){
+    await wait(400);
+    const text=await bodyText(page);
+    if(loadingText(text)){await wait(700);continue}
+    if(completionText(text)||usedText(text))return true;
+    const st=detectStage(text);
+    if(st&&st!==beforeStage)return true;
+    if(text&&text!==beforeText&&!introText(text))return true;
+  }
+  return false;
+}
 
 async function runSurvey(job){
   let context=null;
@@ -82,28 +111,34 @@ async function runSurvey(job){
     const page=await context.newPage();page.setDefaultTimeout(5000);page.on("dialog",d=>d.dismiss().catch(()=>{}));
     await page.goto(job.url,{waitUntil:"domcontentloaded",timeout:30000});
     update(job,12,"Сесію створено","Перевіряю перший екран.","Survey opened");
+    await waitOutLoading(page,job,30000);
     const p=job.preset;let introPassed=false,idle=0;
 
-    for(let step=0;step<16;step++){
+    for(let step=0;step<24;step++){
       if(job.cancelled)throw new Error("Зупинено користувачем");
-      await wait(450);const text=await bodyText(page);
+      await wait(450);
+      let text=await bodyText(page);
+      if(loadingText(text)){
+        text=await waitOutLoading(page,job,30000);
+        if(loadingText(text))throw new Error("Qualtrics не завершив завантаження сторінки за 30 секунд");
+      }
       if(completionText(text)){job.state="done";update(job,100,"Готово","Анкету завершено.","completion=100");return}
       if(usedText(text))throw new Error("Цей чек/QR уже використаний або анкета вже закрита");
-      if(!text){if(++idle<6){update(job,13,"Чекаю Qualtrics…",`Завантаження ${idle}/6`);continue}throw new Error("Qualtrics не віддав сторінку")}
+      if(!text){if(++idle<8){update(job,13,"Чекаю Qualtrics…",`Завантаження ${idle}/8`);await wait(700);continue}throw new Error("Qualtrics не віддав сторінку")}
 
       const stage=detectStage(text);
       if(!stage&&!introPassed&&introText(text)){
         update(job,17,"Вступна сторінка","Натискаю «Далі» один раз.","Intro detected");
         const before=text;if(!(await clickNext(page)))throw new Error("Не знайшов кнопку на вступній сторінці");
         introPassed=true;update(job,20,"Переходжу до питань…","Чекаю перше питання.","Intro passed once");
-        if(!(await waitForChange(page,"",before,8000)))throw new Error("Після вступу не з'явилося перше питання. Повторно Next не натискаю, щоб не псувати чек.");
+        if(!(await waitForChange(page,"",before,30000)))throw new Error("Після вступу не з'явилося перше питання за 30 секунд. Повторно Next не натискаю.");
         continue;
       }
       if(!stage){
-        const validation=await page.locator('.ValidationError,.validation-error,[role="alert"],.ErrorMessage').filter({visible:true}).first().innerText().catch(()=>"");
+        const validation=await page.locator('.ValidationError,.validation-error,[role="alert"],.ErrorMessage').first().innerText().catch(()=>"");
         if(validation?.trim())throw new Error(`Qualtrics: ${validation.trim().slice(0,250)}`);
         if(introText(text)&&introPassed)throw new Error("Qualtrics залишився на вступному екрані після одного кліку. Повторно Next не натискаю.");
-        if(++idle<5){update(job,Math.max(job.progress,21),"Чекаю питання…",`Спроба ${idle}/5`);continue}
+        if(++idle<8){update(job,Math.max(job.progress,21),"Чекаю питання…",`Спроба ${idle}/8`);await wait(800);continue}
         throw new Error(`Невідомий екран: ${text.slice(0,320)}`);
       }
       idle=0;
@@ -126,7 +161,7 @@ async function runSurvey(job){
       }
       update(job,progress,status,"","Stage: "+stage);
       const before=text;if(!(await clickNext(page)))throw new Error("Не знайшов кнопку «Далі» на розпізнаному питанні");
-      if(!(await waitForChange(page,stage,before,8000)))throw new Error("Після відповіді сторінка не змінилась. Повторно кнопку не натискаю.");
+      if(!(await waitForChange(page,stage,before,30000)))throw new Error("Після відповіді сторінка не змінилась за 30 секунд. Повторно кнопку не натискаю.");
     }
     throw new Error("Анкета не завершилась у межах очікуваних екранів");
   }catch(err){
@@ -161,12 +196,14 @@ app.post("/api/decode-qr",express.raw({type:["image/*","application/octet-stream
   try{if(!req.body?.length)return res.status(400).json({error:"Порожнє фото"});const value=await decodeReceipt(req.body);if(!value)return res.status(422).json({error:"QR не знайдено"});res.json({value})}catch(e){res.status(422).json({error:String(e?.message||e)})}
 });
 app.use(express.json({limit:"256kb"}));
+
+
 app.use(express.static(path.join(__dirname,"public"),{maxAge:0,etag:false,setHeaders(res){res.setHeader("Cache-Control","no-store, no-cache, must-revalidate, max-age=0")}}));
-app.get("/api/health",(_req,res)=>res.json({ok:true,service:"gelya-gelya",version:"5.0",port:PORT,ts:Date.now()}));
+app.get("/api/health",(_req,res)=>res.json({ok:true,service:"gelya-gelya",version:"5.1",port:PORT,ts:Date.now()}));
 app.get("/api/health/browser",async(_req,res)=>{try{const b=await getBrowser();res.json({ok:true,browser:await b.version(),ts:Date.now()})}catch(e){res.status(500).json({ok:false,error:String(e?.message||e)})}});
 app.post("/api/jobs",(req,res)=>{const surveyUrl=String(req.body?.surveyUrl||"").trim();if(!validSurveyUrl(surveyUrl))return res.status(400).json({error:"Невірне посилання анкети"});const id=crypto.randomUUID();const j={id,state:"running",progress:0,status:"Старт…",detail:"",log:[],createdAt:Date.now(),updatedAt:Date.now(),url:surveyUrl,preset:normalizePreset(req.body?.preset),cancelled:false};jobs.set(id,j);runSurvey(j);res.status(202).json(publicJob(j))});
 app.get("/api/jobs/:id",(req,res)=>{const j=jobs.get(req.params.id);if(!j)return res.status(404).json({error:"Job not found"});res.json(publicJob(j))});
 app.delete("/api/jobs/:id",(req,res)=>{const j=jobs.get(req.params.id);if(!j)return res.status(404).json({error:"Job not found"});j.cancelled=true;res.json({ok:true})});
 app.get("*",(_req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 setInterval(()=>{const cutoff=Date.now()-3600000;for(const[id,j]of jobs)if(j.updatedAt<cutoff)jobs.delete(id)},600000).unref();
-app.listen(PORT,"0.0.0.0",()=>console.log(`Геля-Геля v5 listening on ${PORT}`));
+app.listen(PORT,"0.0.0.0",()=>console.log(`Геля-Геля v5.1 listening on ${PORT}`));
