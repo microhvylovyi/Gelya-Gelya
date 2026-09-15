@@ -9,5 +9,3 @@
 - чистий root проєкту без вкладених папок.
 
 Для Railway: root directory = /, Dockerfile = Dockerfile, start = node server.mjs.
-deploy v5
-deploy v5 now
